@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日本生日之旅</title>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#EFE9E1">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2060/2060250.png">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Confetti JS -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        /* Fonts Import */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Noto+Sans+TC:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Zen+Old+Mincho:wght@400;500;600;700;900&display=swap');
+
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #D8D8D8; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Fonts */
+        .font-serif-en { font-family: 'Zen Old Mincho', serif !important; letter-spacing: 0.02em; }
+        .font-sans-en { font-family: 'Outfit', sans-serif !important; letter-spacing: 0.05em; }
+        .font-serif-jp { font-family: 'Zen Old Mincho', serif !important; font-weight: 600; letter-spacing: 0.05em; }
+        .font-sans-jp { font-family: 'Noto Sans TC', sans-serif !important; font-weight: 400; }
+        .font-cover-en { font-family: 'Bodoni Moda', serif !important; letter-spacing: 0.02em; }
+        .font-cover-jp { font-family: 'Zen Old Mincho', serif !important; }
+
+        /* Utilities */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* App Container */
+        .app-container {
+            border-radius: 0px;
+            box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            position: relative; 
+            min-height: 100vh;
+            background-color: #EFE9E1;
+        }
+        @media (min-width: 768px) {
+            .app-container { border-radius: 2rem; }
+        }
+
+        /* Animations */
+        #home-screen {
+            transition: opacity 0.6s ease-in-out, visibility 0.6s;
+            opacity: 1;
+            z-index: 100;
+        }
+
+        #app-content-layer {
+            transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease;
+            transform: scale(0.95);
+            opacity: 0;
+            will-change: transform, opacity;
+        }
+        #app-content-layer.entered {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        /* Scroll Reveal Animation */
+        .reveal-item {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 1.0s ease-out, transform 1.0s cubic-bezier(0.2, 0.8, 0.2, 1);
+            will-change: opacity, transform;
+        }
+        .reveal-item.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Collapsible Sections */
+        #booking-details-content {
+            transition: max-height 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+            max-height: 0;
+            overflow: hidden;
+        }
+        #booking-details-content.open {
+            max-height: 1000px;
+        }
+
+        .item-details {
+            transition: max-height 0.5s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.4s ease;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+        .itinerary-item.active .item-details {
+            max-height: 600px;
+            opacity: 1;
+            margin-top: 1.5rem;
+        }
+        .itinerary-item.active .chevron {
+            transform: rotate(180deg);
+        }
+
+        /* SOS Button */
+        .sos-fab {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 50;
+            box-shadow: 0 10px 25px rgba(185, 28, 28, 0.3);
+            transition: transform 0.2s;
+        }
+        .sos-fab:active { transform: scale(0.92); }
+
+        /* Timeline Styling */
+        .itinerary-item {
+            position: relative;
+            transition: background-color 0.3s ease;
+        }
+        .itinerary-item:active {
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .timeline-line {
+            position: absolute;
+            left: 1.65rem;
+            top: 3.5rem;
+            bottom: -1rem;
+            width: 1px;
+            background-color: #D6D3D1; 
+            z-index: 0;
+        }
+        .itinerary-item:last-child .timeline-line {
+            display: none;
+        }
+
+        /* Weather Card Glass Effect */
+        .weather-glass {
+            background: linear-gradient(135deg, #2C3E50, #000000);
+            color: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .weather-glass::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        /* Icon Animations */
+        @keyframes smooth-takeoff {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            20% { transform: translate(-10px, 5px) scale(0.9); }
+            40% { transform: translate(10px, -10px) rotate(-10deg) scale(1.1); opacity: 1; }
+            100% { transform: translate(200px, -120px) rotate(-20deg) scale(0.5); opacity: 0; }
+        }
+        .animate-plane {
+            animation: smooth-takeoff 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+            display: inline-block;
+            transform-origin: center center;
+            will-change: transform, opacity;
+        }
+
+        @keyframes bounce-custom {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+        .animate-bounce-custom {
+            animation: bounce-custom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: inline-block;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center min-h-screen md:py-10 bg-gray-300">
+
+    <!-- Mobile-First Container -->
+    <div class="w-full max-w-md app-container bg-[#EFE9E1] md:shadow-2xl">
+        
+        <!-- ============================================= -->
+        <!-- HOME SCREEN (Cover) -->
+        <!-- ============================================= -->
+        <div id="home-screen" 
+             onclick="enterApp()" 
+             class="fixed inset-0 flex flex-col justify-end p-10 cursor-pointer bg-cover bg-center"
+             style="background-image: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.1) 100%), url('https://images.unsplash.com/photo-1513407030348-c983a97b98d8?q=80&w=2072&auto=format&fit=crop');">
+            
+            <div class="mb-16 text-center text-white">
+                <div class="inline-flex items-center justify-center px-5 py-2 mb-6 border border-white/30 bg-white/10 backdrop-blur-md rounded-full">
+                    <span class="text-[10px] tracking-[0.3em] uppercase font-bold font-cover-en text-white">🇯🇵 TOKYO TRIP 2025 🗼</span>
+                </div>
+                
+                <h1 class="text-7xl font-bold mb-2 leading-none tracking-tight">
+                    <span class="font-cover-en italic block mb-1">12</span>
+                    <span style="font-family: 'Zen Old Mincho', serif;" class="text-4xl block mt-2">生日之旅</span>
+                </h1>
+                
+                <div class="w-12 h-0.5 bg-white/50 mx-auto my-6"></div>
+
+                <p class="text-lg font-cover-en italic font-medium tracking-widest opacity-90">
+                    Happy Birthday
+                </p>
+            </div>
+            
+            <div class="absolute bottom-10 left-0 right-0 text-center animate-pulse">
+                <p class="text-[10px] font-sans-en font-bold tracking-[0.3em] uppercase text-white/60">
+                    Tap to Enter
+                </p>
+            </div>
+        </div>
+        
+        <!-- ============================================= -->
+        <!-- MAIN APP CONTENT -->
+        <!-- ============================================= -->
+        <div id="app-content-layer" class="h-full flex flex-col">
+
+            <!-- Sticky Header Area -->
+            <header id="main-header" class="bg-[#EFE9E1] sticky top-0 z-40 shadow-sm">
+                <div class="px-8 pt-10 pb-4">
+                    <div class="flex justify-between items-end border-b border-stone-300 pb-4">
+                        <div>
+                            <h1 class="text-3xl font-bold text-stone-800 tracking-wide font-serif-jp">東京行</h1>
+                            <p class="text-xs text-stone-500 font-bold mt-2 font-sans-en tracking-widest">DEC 02 — DEC 05</p>
+                        </div>
+                        <div id="budget-summary" class="text-right">
+                            <!-- Budget injected by JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Booking Toggle -->
+                    <button onclick="toggleBookingDetails()" class="w-full py-3 flex justify-between items-center group">
+                        <span class="text-[10px] font-bold text-stone-400 tracking-[0.2em] uppercase font-sans-en group-hover:text-stone-600 transition-colors">
+                            TICKETS & HOTEL
+                        </span>
+                        <span id="toggle-icon" class="text-stone-400 transform transition-transform duration-300">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Booking Details (Collapsible) -->
+                <div id="booking-details-content" class="bg-[#E8E2D9]">
+                    <div id="booking-details-inner" class="px-8 py-6 space-y-6">
+                        <!-- Content injected by JS -->
+                    </div>
+                </div>
+
+                <!-- Day Tabs (Always Visible) -->
+                <nav id="day-tabs" class="flex justify-around px-2 border-b border-stone-200 bg-[#EFE9E1]">
+                    <!-- Tabs injected by JS -->
+                </nav>
+            </header>
+
+            <!-- Main Scroll Area -->
+            <main id="itinerary-content" class="flex-1 overflow-y-auto p-0 pb-32 bg-[#EFE9E1]">
+                <!-- Timeline injected by JS -->
+            </main>
+            
+            <!-- SOS Button -->
+            <button onclick="switchToEmergency()" class="sos-fab bg-red-700 hover:bg-red-800 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:shadow-none transition-colors">
+                <span class="text-xl font-bold font-sans-en">SOS</span>
+            </button>
+
+        </div>
+    </div>
+
+    <!-- ============================================= -->
+    <!-- JAVASCRIPT -->
+    <!-- ============================================= -->
+    <script>
+        // PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log(err)));
+        }
+
+        // Data
+        const BOOKING_INFO = {
+            orderId: "1359041237819550",
+            pnr: "E58BJS",
+            passengers: ["CHIU HIU WING", "LAM CHIU TING"],
+            baggage: { checked: "Checked: 1 pc (20kg)", carryOn: "Carry-on: 1 pc", checkInTime: "Arrive 3hrs prior" },
+            hotel: { name: "Super Hotel Premier Akihabara", address: "2 Chome-25-8 Kanda Sudacho", phone: "+81-3-6890-9000", checkInLimit: "23:30", payment: "HK$46.00 + Tax" }
+        };
+
+        const EMERGENCY_INFO = [
+            { title: "Police", number: "110", desc: "Theft, Accidents", icon: "👮" },
+            { title: "Ambulance / Fire", number: "119", desc: "Medical Emergency, Fire", icon: "🚑" },
+            { title: "HK Immigration", number: "+852 1868", desc: "24h Assistance Hotline", icon: "🇭🇰" },
+            { title: "Hotel Front Desk", number: BOOKING_INFO.hotel.phone, desc: "Super Hotel Akihabara", icon: "🏨" }
+        ];
+
+        const itineraryData = [
+            {
+                date: "12/2 (二)", shortDate: "02", city: "AKASAKA / GINZA", theme: "魔法與繁華", 
+                weather: { temp: "Loading...", condition: "...", summary: "Fetching..." },
+                lat: 35.6726, lng: 139.7375, isoDate: "2025-12-02",
+                guide: "赤坂站出來就是魔法世界，銀座木村家紅豆麵包必買。",
+                events: [
+                    { time: "06:55", activity: "抵達成田 T2", icon: "🛬", category: 'transport', cost: 0, desc: "UO854 | 領行李、入境", address: "Narita Airport Terminal 2" },
+                    { time: "08:30", activity: "前往酒店寄放行李", icon: "🧳", category: 'transport', cost: 2500, desc: "Skyliner (日暮里轉JR) -> 秋葉原", address: BOOKING_INFO.hotel.address },
+                    { time: "10:15", activity: "前往赤坂", icon: "🚇", category: 'transport', cost: 200, desc: "秋葉原搭千代田線直達赤坂", address: "Akasaka Station" },
+                    { time: "11:00", activity: "赤坂巫師世界 & 早午餐", icon: "🧙‍♂️", category: 'attraction', cost: 0, desc: "拍照打卡：時光器、大階梯", address: "Akasaka Biz Tower" },
+                    { time: "12:15", activity: "哈利波特與被詛咒的孩子", icon: "🎭", category: 'attraction', cost: 0, desc: "Akasaka ACT Theater | 需預留4小時", address: "TBS Akasaka ACT Theater" },
+                    { time: "16:30", activity: "前往銀座", icon: "🛍️", category: 'transport', cost: 200, desc: "搭乘丸之內線/銀座線", address: "Ginza Station" },
+                    { time: "17:00", activity: "銀座逛街", icon: "✨", category: 'attraction', cost: 0, desc: "Uniqlo 旗艦店 / 伊東屋 / 步行者天國", address: "UNIQLO Ginza" },
+                    { time: "19:30", activity: "晚餐：Ushigoro 銀座店", icon: "🥩", category: 'food', cost: 31600, desc: "預約號: AWYTFWX9VE | 季節匠套餐", address: "Yakiniku Ushigoro Ginza Ten" },
+                    { time: "21:30", activity: "辦理入住 Check-in", icon: "🏨", category: 'hotel', cost: 0, desc: "⚠️ 23:30 前必須完成！", address: BOOKING_INFO.hotel.address, isWarning: true }
+                ]
+            },
+            {
+                date: "12/3 (三)", shortDate: "03", city: "HARAJUKU / ROPPONGI", theme: "時尚與燈飾", 
+                weather: { temp: "Loading...", condition: "...", summary: "Fetching..." },
+                lat: 35.6664, lng: 139.7316, isoDate: "2025-12-03",
+                guide: "I'm donut? 建議開店前排隊。六本木燈飾背景是東京鐵塔。",
+                events: [
+                    { time: "09:30", activity: "自由活動", icon: "✨", category: 'attraction', cost: 0, desc: "明治神宮 / 原宿隨意逛逛", address: "" },
+                    { time: "11:30", activity: "I'm donut? 原宿店", icon: "🍩", category: 'food', cost: 0, desc: "超人氣生甜甜圈 (原宿站對面)", address: "I'm donut? Harajuku" },
+                    { time: "13:00", activity: "午餐：極味屋", icon: "🥩", category: 'food', cost: 0, desc: "澀谷 Parco 店 | 鐵板漢堡排", address: "Kiwamiya Shibuya Parco" },
+                    { time: "15:00", activity: "自由活動", icon: "☕", category: 'attraction', cost: 0, desc: "隨意探索 / 休息 / 提早去六本木", address: "" },
+                    { time: "17:30", activity: "晚餐：Sushi Tokyo Ten", icon: "🍣", category: 'food', cost: 0, desc: "六本木店 | Omakase (需準時)", address: "Sushi Tokyo Ten Roppongi" },
+                    { time: "19:30", activity: "六本木聖誕燈飾", icon: "🎄", category: 'attraction', cost: 0, desc: "Midtown -> 櫸坂通絕景", address: "Roppongi Keyakizaka Dori" }
+                ]
+            },
+            {
+                date: "12/4 (四)", shortDate: "04", city: "FREE DAY", theme: "放鬆一日", 
+                weather: { temp: "Loading...", condition: "...", summary: "Fetching..." },
+                lat: 35.6895, lng: 139.6917, isoDate: "2025-12-04",
+                guide: "建議去新宿御苑或代官山散步。",
+                events: [ { time: "全日", activity: "自由活動", icon: "✨", category: 'attraction', cost: 0, desc: "睡到自然醒，隨意探索東京", address: "" } ]
+            },
+            {
+                date: "12/5 (五)", shortDate: "05", city: "OTSUKA / UENO", theme: "完美句點", 
+                weather: { temp: "Loading...", condition: "...", summary: "Fetching..." },
+                lat: 35.7311, lng: 139.7281, isoDate: "2025-12-05",
+                guide: "Bongo 飯糰建議 10:30 前到。Skyliner 記得先買票。",
+                events: [
+                    { time: "09:30", activity: "退房 Check-out", icon: "👋", category: 'hotel', cost: 0, desc: "行李帶至上野或寄放", address: BOOKING_INFO.hotel.address, isWarning: true },
+                    { time: "10:00", activity: "前往大塚站", icon: "🚇", category: 'transport', cost: 200, desc: "山手線直達", address: "Otsuka Station" },
+                    { time: "10:30", activity: "排隊：Onigiri Bongo", icon: "🍙", category: 'food', cost: 0, desc: "東京最強飯糰，準備排隊", address: "Onigiri Bongo" },
+                    { time: "11:30", activity: "午餐：Bongo 飯糰", icon: "😋", category: 'food', cost: 0, desc: "推薦：鮭魚美乃滋、筋子", address: "" },
+                    { time: "13:00", activity: "上野阿美橫丁", icon: "🛍️", category: 'attraction', cost: 0, desc: "最後補貨：藥妝、零食", address: "Ameyoko Shopping District" },
+                    { time: "15:30", activity: "Skyliner 往機場", icon: "🚆", category: 'transport', cost: 2500, desc: "京成上野站發車", address: "Keisei Ueno Station" },
+                    { time: "16:45", activity: "成田 T2 辦理登機", icon: "🛫", category: 'transport', cost: 0, desc: "UO647 | 起飛前3小時", address: "Narita Airport Terminal 2" },
+                    { time: "19:00", activity: "起飛返港", icon: "🇭🇰", category: 'transport', cost: 0, desc: "旅程圓滿結束", address: "" }
+                ]
+            }
+        ];
+
+        let currentActiveDay = 0;
+        let isBookingOpen = false;
+
+        async function fetchRealTimeWeather(dayIndex) {
+            const day = itineraryData[dayIndex];
+            if (!day.lat || !day.lng || !day.isoDate) return;
+
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${day.lat}&longitude=${day.lng}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&start_date=${day.isoDate}&end_date=${day.isoDate}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.daily && data.daily.time.length > 0) {
+                    const maxTemp = Math.round(data.daily.temperature_2m_max[0]);
+                    const wmoCode = data.daily.weather_code[0];
+
+                    let condition = "Clear";
+                    
+                    if (wmoCode === 0) { condition = "Sunny"; }
+                    else if (wmoCode >= 1 && wmoCode <= 3) { condition = "Cloudy"; }
+                    else if (wmoCode >= 45 && wmoCode <= 48) { condition = "Foggy"; }
+                    else if (wmoCode >= 51 && wmoCode <= 67) { condition = "Rainy"; }
+                    else if (wmoCode >= 71) { condition = "Snowy"; }
+
+                    day.weather.temp = `${maxTemp}°`;
+                    day.weather.condition = condition;
+
+                    if (currentActiveDay === dayIndex) {
+                        const tempEl = document.getElementById('weather-temp-display');
+                        const condEl = document.getElementById('weather-condition-display');
+                        const iconEl = document.getElementById('weather-icon-display');
+                        
+                        if(tempEl) tempEl.innerText = day.weather.temp;
+                        if(condEl) condEl.innerText = day.weather.condition;
+                        if(iconEl) iconEl.innerHTML = getWeatherSvg(day.weather.condition);
+                    }
+                }
+            } catch (error) {
+                console.log("Weather fetch failed", error);
+            }
+        }
+
+        function enterApp() {
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            setTimeout(() => {
+                const home = document.getElementById('home-screen');
+                const content = document.getElementById('app-content-layer');
+                home.style.opacity = '0'; 
+                home.style.pointerEvents = 'none';
+                setTimeout(() => {
+                    content.classList.add('entered');
+                }, 50);
+                setTimeout(() => { 
+                    home.style.display = 'none'; 
+                    updateStickyHeaderPosition(); 
+                }, 800);
+            }, 300);
+        }
+
+        function updateStickyHeaderPosition() {
+            const headerHeight = document.getElementById('main-header').offsetHeight;
+            const dayTabs = document.getElementById('day-tabs'); 
+            if (dayTabs) {
+                dayTabs.style.top = `${headerHeight}px`;
+            }
+        }
+
+        function toggleBookingDetails() {
+            isBookingOpen = !isBookingOpen;
+            const content = document.getElementById('booking-details-content');
+            const icon = document.getElementById('toggle-icon');
+            
+            if (isBookingOpen) {
+                content.classList.add('open');
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                content.classList.remove('open');
+                icon.style.transform = 'rotate(0deg)';
+            }
+            setTimeout(updateStickyHeaderPosition, 600);
+        }
+
+        function updateBudget() {
+            let total = 0;
+            itineraryData.forEach(d => d.events.forEach(e => {
+                if (e.category === 'transport' || e.activity.includes('Ushigoro')) total += e.cost;
+            }));
+            const budgetHKD = 12000;
+            const balance = budgetHKD - Math.round(total * 0.052);
+            document.getElementById('budget-summary').innerHTML = `
+                <div class="flex flex-col items-end">
+                    <span class="text-[8px] text-stone-400 font-bold tracking-widest font-sans-en mb-0.5">BALANCE (HKD)</span>
+                    <span class="text-base font-bold ${balance >= 0 ? 'text-stone-800' : 'text-red-700'} font-serif-en">$${balance.toLocaleString()}</span>
+                </div>
+            `;
+        }
+
+        function renderBookingInfo() {
+            const html = `
+                <div class="flex flex-col space-y-4">
+                    <div class="border-l-2 border-stone-400 pl-4">
+                        <p class="text-[10px] text-stone-400 uppercase tracking-[0.2em] font-sans-en mb-1">Flight</p>
+                        <div class="flex justify-between items-baseline">
+                            <p class="text-lg font-bold font-serif-en text-stone-800">${BOOKING_INFO.pnr}</p>
+                            <span class="text-stone-400">✈️</span>
+                        </div>
+                        <p class="text-xs text-stone-500 font-sans-en mt-1">${BOOKING_INFO.passengers.join(' & ')}</p>
+                    </div>
+                    
+                    <div class="border-l-2 border-stone-300 pl-4">
+                        <p class="text-[10px] text-stone-400 uppercase tracking-[0.2em] font-sans-en mb-1">Accommodation</p>
+                        <div class="flex justify-between items-baseline">
+                            <p class="text-base font-bold font-serif-jp text-stone-800 leading-snug w-3/4">${BOOKING_INFO.hotel.name}</p>
+                            <span class="text-stone-400">🏨</span>
+                        </div>
+                        <p class="text-[10px] text-stone-500 font-sans-en mt-2 uppercase tracking-wide">${BOOKING_INFO.hotel.address}</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('booking-details-inner').innerHTML = html;
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('day-tabs');
+            container.innerHTML = '';
+            itineraryData.forEach((day, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `flex-1 py-4 relative group focus:outline-none transition-all duration-500`;
+                btn.onclick = () => switchDay(idx);
+                
+                const isActive = idx === currentActiveDay;
+                const colorClass = isActive ? 'text-stone-800 opacity-100' : 'text-stone-400 opacity-60 hover:opacity-100';
+                const scaleClass = isActive ? 'scale-110' : 'scale-100';
+
+                btn.innerHTML = `
+                    <div class="flex flex-col items-center ${colorClass} ${scaleClass} transition-all duration-500">
+                        <span class="text-[10px] font-bold tracking-widest font-sans-en mb-1">DEC</span>
+                        <span class="text-xl font-serif-en italic">${day.shortDate}</span>
+                    </div>
+                    <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-stone-800 transition-all duration-500 ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}"></div>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        function toggleEventDetails(element) {
+            const item = element.closest('.itinerary-item');
+            item.classList.toggle('active');
+        }
+
+        function animateIcon(element, icon) {
+            const span = element.querySelector('span');
+            if (icon.includes('✈️') || icon.includes('🛬') || icon.includes('🛫')) {
+                if (span.classList.contains('animate-plane')) return;
+                span.classList.add('animate-plane');
+                setTimeout(() => {
+                    span.classList.remove('animate-plane');
+                }, 1200); 
+            } else {
+                span.classList.add('animate-bounce-custom');
+                setTimeout(() => {
+                    span.classList.remove('animate-bounce-custom');
+                }, 500);
+            }
+        }
+
+        function getWeatherSvg(condition) {
+            const c = condition ? condition.toLowerCase() : '';
+            if(c.includes('sunny') || c.includes('clear')) return `<svg class="w-24 h-24 text-yellow-600 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>`;
+            if(c.includes('cloud')) return `<svg class="w-24 h-24 text-stone-500 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>`;
+            if(c.includes('rain')) return `<svg class="w-24 h-24 text-blue-500 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>`;
+            return `<svg class="w-24 h-24 text-stone-400 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>`;
+        }
+
+        function switchDay(idx) {
+            currentActiveDay = idx;
+            renderTabs();
+            const day = itineraryData[idx];
+            
+            fetchRealTimeWeather(idx);
+
+            if (isBookingOpen) {
+                toggleBookingDetails();
+            }
+            
+            const container = document.getElementById('itinerary-content');
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            // 1. 封面區塊：設定 min-h-[55vh] 讓它佔據上半部大部分空間
+            // justify-end 讓內容沉在底部
+            let html = `
+                <div class="min-h-[55vh] flex flex-col justify-end px-8 pb-10 animate-fade-in reveal-item">
+                    <div class="flex flex-col items-center justify-center border-b border-stone-300 pb-8 mb-8">
+                        <div id="weather-icon-display" class="mb-6 transition-transform transform hover:scale-110">
+                            ${getWeatherSvg(day.weather.condition)}
+                        </div>
+                        <div class="text-center">
+                            <p id="weather-temp-display" class="text-8xl font-serif-en text-stone-800 leading-none tracking-tighter">${day.weather.temp}</p>
+                            <p id="weather-condition-display" class="text-xs font-sans-en text-stone-500 uppercase tracking-[0.2em] mt-3">${day.weather.condition}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                         <p class="font-serif-jp font-bold text-stone-600 leading-loose text-sm text-center italic">
+                            “ ${day.guide} ”
+                         </p>
+                    </div>
+                </div>
+            `;
+
+            // 2. 列表區塊：接在下方
+            html += `<div class="px-4 space-y-0 animate-zoom-in pb-32">`; 
+            
+            day.events.forEach((ev, i) => {
+                // Stagger Delay
+                const delay = i * 150;
+                
+                html += `
+                    <div class="itinerary-item reveal-item group cursor-pointer py-5 px-4 rounded-lg" style="transition-delay: ${delay}ms" onclick="toggleEventDetails(this)">
+                        <div class="timeline-line"></div>
+
+                        <div class="flex items-start relative z-10">
+                            <div class="w-16 pt-1 text-right mr-6 flex-shrink-0">
+                                <p class="font-serif-en text-lg text-stone-800">${ev.time}</p>
+                            </div>
+
+                            <div class="w-8 h-8 rounded-full bg-[#EFE9E1] border border-stone-300 flex items-center justify-center text-sm mr-4 z-20 shadow-sm group-hover:scale-110 transition-transform" onclick="animateIcon(this, '${ev.icon}'); event.stopPropagation();">
+                                <span class="inline-block transition-all">${ev.icon}</span>
+                            </div>
+
+                            <div class="flex-1 pt-0.5 border-b border-stone-300/40 pb-5 group-last:border-0">
+                                <div class="flex justify-between items-center">
+                                    <h3 class="text-base font-bold font-serif-jp text-stone-800 group-hover:text-stone-600 transition-colors ${ev.isWarning ? 'text-red-700' : ''}">${ev.activity}</h3>
+                                    <div class="chevron text-stone-300 transition-transform duration-500">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    </div>
+                                </div>
+                                
+                                <div class="item-details">
+                                    <div class="pt-4 space-y-3">
+                                        <p class="text-sm text-stone-500 font-sans-jp leading-relaxed">${ev.desc}</p>
+                                        
+                                        ${ev.address ? `
+                                        <div class="flex items-center justify-between mt-2">
+                                            <p class="text-[10px] text-stone-400 font-sans-en uppercase tracking-wide truncate w-2/3">${ev.address}</p>
+                                            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.address)}" target="_blank" onclick="event.stopPropagation()" class="text-[10px] font-bold font-sans-en text-stone-800 border-b border-stone-800 hover:text-stone-500 hover:border-stone-500 transition-colors pb-0.5">
+                                                NAVIGATE
+                                            </a>
+                                        </div>` : ''}
+                                        
+                                        ${ev.cost > 0 ? `
+                                        <p class="text-right text-xs font-serif-en text-stone-400 mt-1">¥${ev.cost.toLocaleString()}</p>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            
+            container.innerHTML = html;
+
+            // 3. Scroll Reveal Observer
+            setTimeout(() => {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            observer.unobserve(entry.target);
+                        }
+                    });
+                }, {
+                    root: null, // Use viewport
+                    threshold: 0.1
+                });
+
+                const elements = container.querySelectorAll('.reveal-item');
+                elements.forEach((el) => {
+                    observer.observe(el);
+                });
+            }, 100);
+        }
+
+        function switchToEmergency() {
+            currentActiveDay = -1;
+            renderTabs(); 
+            
+            if (isBookingOpen) toggleBookingDetails();
+
+            const container = document.getElementById('itinerary-content');
+            let html = `
+                <div class="px-8 pt-8 pb-6 animate-zoom-in reveal-item visible">
+                    <h2 class="text-3xl font-serif-jp font-bold text-red-800 mb-2">緊急聯絡</h2>
+                    <p class="text-xs text-red-400 font-sans-en tracking-widest uppercase">Emergency Assistance</p>
+                </div>
+                <div class="px-4 space-y-3 animate-zoom-in">
+            `;
+
+            EMERGENCY_INFO.forEach((info, index) => {
+                const delay = index * 100;
+                html += `
+                    <div class="bg-[#E8E2D9] p-6 rounded-sm flex items-center justify-between reveal-item visible" style="transition-delay: ${delay}ms">
+                        <div>
+                            <p class="text-xs font-sans-en font-bold text-stone-400 uppercase tracking-widest mb-1">${info.title}</p>
+                            <p class="text-2xl font-serif-en text-stone-800">${info.number}</p>
+                            <p class="text-xs text-stone-500 font-sans-jp mt-1">${info.desc}</p>
+                        </div>
+                        <a href="tel:${info.number.replace(/\s/g, '')}" class="w-10 h-10 rounded-full border border-stone-300 flex items-center justify-center text-stone-400 hover:bg-stone-800 hover:text-white transition-all">
+                            <span class="text-lg">📞</span>
+                        </a>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        window.onload = function() {
+            renderBookingInfo();
+            renderTabs();
+            switchDay(0);
+            updateBudget();
+            isBookingOpen = false;
+            document.getElementById('booking-details-content').classList.remove('open');
+        };
+    </script>
+</body>
+</html>
