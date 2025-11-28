@@ -80,6 +80,15 @@
             transform: translateY(0);
         }
 
+        /* Zoom In Animation */
+        @keyframes zoom-in-enter {
+            0% { transform: scale(0.96) translateY(10px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .animate-zoom-in {
+            animation: zoom-in-enter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
         /* Collapsible Sections */
         #booking-details-content {
             transition: max-height 0.6s cubic-bezier(0.65, 0, 0.35, 1);
@@ -88,6 +97,18 @@
         }
         #booking-details-content.open {
             max-height: 1000px;
+        }
+        
+        /* Wallet Form Toggle */
+        #wallet-form-container {
+            transition: max-height 0.4s ease-in-out, opacity 0.4s ease;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+        #wallet-form-container.open {
+            max-height: 600px;
+            opacity: 1;
         }
 
         .item-details {
@@ -109,12 +130,36 @@
         .sos-fab {
             position: fixed;
             bottom: 30px;
-            right: 30px;
-            z-index: 50;
+            right: 20px;
+            z-index: 60;
             box-shadow: 0 10px 25px rgba(185, 28, 28, 0.3);
-            transition: transform 0.2s;
+            transition: transform 0.2s, opacity 0.5s;
         }
         .sos-fab:active { transform: scale(0.92); }
+        .sos-fab.hidden-ui { opacity: 0; pointer-events: none; }
+
+        /* Next Event Floating Bar */
+        #next-event-bar {
+            position: fixed;
+            bottom: 30px;
+            left: 20px;
+            right: 90px;
+            z-index: 50;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
+            transform: translateY(0);
+            opacity: 1;
+            display: flex;
+        }
+        #next-event-bar.scroll-hidden {
+            transform: translateY(150%);
+            opacity: 0;
+        }
+        #next-event-bar.force-hidden {
+            display: none !important;
+        }
+        #next-event-bar.hidden-ui {
+            opacity: 0; pointer-events: none;
+        }
 
         /* Timeline Styling */
         .itinerary-item {
@@ -156,6 +201,21 @@
             pointer-events: none;
         }
 
+        /* Wallet Styling */
+        .input-premium {
+            background: #F7F5F2;
+            border: 1px solid #E5E0D8;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Outfit', sans-serif;
+            transition: all 0.3s ease;
+        }
+        .input-premium:focus {
+            background: white;
+            border-color: #57534E;
+            outline: none;
+        }
+        
         /* Icon Animations */
         @keyframes smooth-takeoff {
             0% { transform: translate(0, 0) scale(1); opacity: 1; }
@@ -220,14 +280,14 @@
         <!-- ============================================= -->
         <!-- MAIN APP CONTENT -->
         <!-- ============================================= -->
-        <div id="app-content-layer" class="h-full flex flex-col">
+        <div id="app-content-layer" class="h-full flex flex-col relative">
 
             <!-- Sticky Header Area -->
             <header id="main-header" class="bg-[#EFE9E1] sticky top-0 z-40 shadow-sm">
                 <div class="px-8 pt-10 pb-4">
                     <div class="flex justify-between items-end border-b border-stone-300 pb-4">
                         <div>
-                            <h1 class="text-3xl font-bold text-stone-800 tracking-wide font-serif-jp">東京行</h1>
+                            <h1 id="header-title" class="text-3xl font-bold text-stone-800 tracking-wide font-serif-jp">東京行</h1>
                             <p class="text-xs text-stone-500 font-bold mt-2 font-sans-en tracking-widest">DEC 02 — DEC 05</p>
                         </div>
                         <div id="budget-summary" class="text-right">
@@ -263,19 +323,67 @@
             <main id="itinerary-content" class="flex-1 overflow-y-auto p-0 pb-32 bg-[#EFE9E1]">
                 <!-- Timeline injected by JS -->
             </main>
-            
-            <!-- SOS Button -->
-            <button onclick="switchToEmergency()" class="sos-fab bg-red-700 hover:bg-red-800 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:shadow-none transition-colors">
-                <span class="text-xl font-bold font-sans-en">SOS</span>
-            </button>
-
+        
         </div>
+        
+        <!-- Floating Elements moved OUTSIDE of content layer for safer positioning -->
+        
+        <!-- Next Event Floating Card (Smart Hide/Show + Animation) -->
+        <div id="next-event-bar" class="glass-dark rounded-xl p-4 flex items-center justify-between cursor-pointer group hidden-ui bg-[#2C2C2C]/95 backdrop-blur-md border border-stone-600/30 shadow-2xl">
+            <div class="flex flex-col">
+                <span class="text-[9px] text-stone-300 font-sans-en tracking-[0.2em] uppercase mb-1">NEXT STOP</span>
+                <h3 id="next-event-title" class="text-sm font-bold font-serif-jp text-white truncate max-w-[160px]">Loading...</h3>
+            </div>
+            <div class="flex items-center pl-4 border-l border-white/10 ml-3">
+                    <span id="next-event-icon" class="text-lg mr-2">📍</span>
+                    <span id="next-event-time" class="text-lg font-serif-en text-white italic">--:--</span>
+            </div>
+        </div>
+
+        <!-- SOS Button -->
+        <button onclick="switchToEmergency()" class="sos-fab bg-red-700 hover:bg-red-800 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:shadow-none transition-colors hidden-ui">
+            <span class="text-xl font-bold font-sans-en">SOS</span>
+        </button>
+
     </div>
 
     <!-- ============================================= -->
     <!-- JAVASCRIPT -->
     <!-- ============================================= -->
     <script>
+        // --- GLOBAL HELPER FUNCTIONS (Must be defined first) ---
+        
+        // 1. Remove item from Wallet (Expense Tracker)
+        window.removeWalletItem = function(id) {
+            // Use standard JS confirm
+            if (confirm("您確定要刪除這筆消費紀錄嗎？")) {
+                const data = JSON.parse(localStorage.getItem('japanTripWallet')) || [];
+                const newData = data.filter(item => item.id !== id);
+                localStorage.setItem('japanTripWallet', JSON.stringify(newData));
+                
+                // Re-render if currently on wallet page
+                // Access renderWalletList via global scope logic since it's defined below
+                const btn = document.getElementById('tab-wallet');
+                if (btn && btn.classList.contains('text-stone-800')) { // simple check if active
+                     renderWalletList_Global();
+                }
+            }
+        };
+
+        // 2. Hide item from Itinerary (Timeline)
+        window.hideItineraryItem = function(dayIdx, eventIdx) {
+            if (confirm("確定要隱藏此行程嗎？\n(費用將會從預算中扣除)")) {
+                const hidden = JSON.parse(localStorage.getItem('japanTripHiddenEvents')) || {};
+                const key = `${dayIdx}-${eventIdx}`;
+                hidden[key] = true;
+                localStorage.setItem('japanTripHiddenEvents', JSON.stringify(hidden));
+                
+                // Refresh current view
+                switchDay_Global(dayIdx);
+                updateBudget_Global();
+            }
+        };
+
         // PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log(err)));
@@ -299,19 +407,20 @@
 
         const itineraryData = [
             {
-                date: "12/2 (二)", shortDate: "02", city: "AKASAKA / GINZA", theme: "魔法與繁華", 
+                date: "12/2 (二)", shortDate: "02", city: "OTSUKA / GINZA", theme: "排隊美食與銀座", 
                 weather: { temp: "Loading...", condition: "...", summary: "Fetching..." },
-                lat: 35.6726, lng: 139.7375, isoDate: "2025-12-02",
-                guide: "赤坂站出來就是魔法世界，銀座木村家紅豆麵包必買。",
+                lat: 35.7311, lng: 139.7281, isoDate: "2025-12-02",
+                guide: "Bongo 飯糰建議 10:30 就去排隊。銀座木村家紅豆麵包必買。",
                 events: [
                     { time: "06:55", activity: "抵達成田 T2", icon: "🛬", category: 'transport', cost: 0, desc: "UO854 | 領行李、入境", address: "Narita Airport Terminal 2" },
                     { time: "08:30", activity: "前往酒店寄放行李", icon: "🧳", category: 'transport', cost: 2500, desc: "Skyliner (日暮里轉JR) -> 秋葉原", address: BOOKING_INFO.hotel.address },
-                    { time: "10:15", activity: "前往赤坂", icon: "🚇", category: 'transport', cost: 200, desc: "秋葉原搭千代田線直達赤坂", address: "Akasaka Station" },
-                    { time: "11:00", activity: "赤坂巫師世界 & 早午餐", icon: "🧙‍♂️", category: 'attraction', cost: 0, desc: "拍照打卡：時光器、大階梯", address: "Akasaka Biz Tower" },
-                    { time: "12:15", activity: "哈利波特與被詛咒的孩子", icon: "🎭", category: 'attraction', cost: 0, desc: "Akasaka ACT Theater | 需預留4小時", address: "TBS Akasaka ACT Theater" },
-                    { time: "16:30", activity: "前往銀座", icon: "🛍️", category: 'transport', cost: 200, desc: "搭乘丸之內線/銀座線", address: "Ginza Station" },
-                    { time: "17:00", activity: "銀座逛街", icon: "✨", category: 'attraction', cost: 0, desc: "Uniqlo 旗艦店 / 伊東屋 / 步行者天國", address: "UNIQLO Ginza" },
-                    { time: "19:30", activity: "晚餐：Ushigoro 銀座店", icon: "🥩", category: 'food', cost: 31600, desc: "預約號: AWYTFWX9VE | 季節匠套餐", address: "Yakiniku Ushigoro Ginza Ten" },
+                    // 更新行程：去大塚
+                    { time: "10:15", activity: "前往大塚站", icon: "🚇", category: 'transport', cost: 200, desc: "山手線直達 (約15分)", address: "Otsuka Station" },
+                    { time: "10:30", activity: "排隊：Onigiri Bongo", icon: "🍙", category: 'food', cost: 0, desc: "東京最強飯糰，準備排隊 (11:30開門)<br>🔥 必吃: 筋子、鮭魚美乃滋、卵黃肉鬆", address: "Onigiri Bongo" },
+                    { time: "11:30", activity: "午餐：Bongo 飯糰", icon: "😋", category: 'food', cost: 0, desc: "推薦：筋子、鮭魚美乃滋、蛋黃肉鬆", address: "" },
+                    { time: "13:30", activity: "前往銀座", icon: "🛍️", category: 'transport', cost: 200, desc: "山手線/地鐵", address: "Ginza Station" },
+                    { time: "14:00", activity: "銀座逛街 / 下午茶", icon: "✨", category: 'attraction', cost: 0, desc: "Uniqlo 旗艦店 / 伊東屋 / 木村家", address: "UNIQLO Ginza" },
+                    { time: "19:30", activity: "晚餐：Ushigoro 銀座店", icon: "🥩", category: 'food', cost: 31600, desc: "預約號: AWYTFWX9VE | 季節匠套餐<br>🔥 必吃: 究極厚切黑毛和牛牛舌、生拌牛肉、松露壽喜燒", address: "Yakiniku Ushigoro Ginza Ten" },
                     { time: "21:30", activity: "辦理入住 Check-in", icon: "🏨", category: 'hotel', cost: 0, desc: "⚠️ 23:30 前必須完成！", address: BOOKING_INFO.hotel.address, isWarning: true }
                 ]
             },
@@ -322,10 +431,13 @@
                 guide: "I'm donut? 建議開店前排隊。六本木燈飾背景是東京鐵塔。",
                 events: [
                     { time: "09:30", activity: "自由活動", icon: "✨", category: 'attraction', cost: 0, desc: "明治神宮 / 原宿隨意逛逛", address: "" },
-                    { time: "11:30", activity: "I'm donut? 原宿店", icon: "🍩", category: 'food', cost: 0, desc: "超人氣生甜甜圈 (原宿站對面)", address: "I'm donut? Harajuku" },
-                    { time: "13:00", activity: "午餐：極味屋", icon: "🥩", category: 'food', cost: 0, desc: "澀谷 Parco 店 | 鐵板漢堡排", address: "Kiwamiya Shibuya Parco" },
-                    { time: "15:00", activity: "自由活動", icon: "☕", category: 'attraction', cost: 0, desc: "隨意探索 / 休息 / 提早去六本木", address: "" },
-                    { time: "17:30", activity: "晚餐：Sushi Tokyo Ten", icon: "🍣", category: 'food', cost: 0, desc: "六本木店 | Omakase (需準時)", address: "Sushi Tokyo Ten Roppongi" },
+                    { time: "11:30", activity: "午餐：極味屋", icon: "🥩", category: 'food', cost: 0, desc: "澀谷 Parco 店 | 鐵板漢堡排 (建議開店前排隊)<br>🔥 必吃: 極味屋漢堡排、伊萬里牛牛排", address: "Kiwamiya Shibuya Parco" },
+                    { time: "13:30", activity: "I'm donut? 原宿店", icon: "🍩", category: 'food', cost: 0, desc: "超人氣生甜甜圈 (原宿站對面)<br>🔥 必吃: 原味生甜甜圈、開心果、生火腿", address: "I'm donut? Harajuku" },
+                    { time: "14:30", activity: "mofusand 原宿店", icon: "🐱", category: 'attraction', cost: 0, desc: "mofusand もふもふストア (原宿店) | 鯊魚貓周邊買爆！", address: "3-23-6 Jingumae, Shibuya City" },
+                    // 補回 ANAKUMA CAFE
+                    { time: "15:15", activity: "ANAKUMA CAFE", icon: "🧸", category: 'food', cost: 1500, desc: "原宿店 | 超療癒熊熊洞，熊掌遞飲料給你！", address: "ANAKUMA CAFE Harajuku" },
+                    { time: "16:00", activity: "前往六本木", icon: "🚇", category: 'transport', cost: 200, desc: "搭乘地鐵前往六本木", address: "Roppongi Station" },
+                    { time: "17:30", activity: "晚餐：Sushi Tokyo Ten", icon: "🍣", category: 'food', cost: 0, desc: "六本木店 | Omakase (需準時)<br>🔥 必吃: 海膽、鮑魚、蜆湯", address: "Sushi Tokyo Ten Roppongi" },
                     { time: "19:30", activity: "六本木聖誕燈飾", icon: "🎄", category: 'attraction', cost: 0, desc: "Midtown -> 櫸坂通絕景", address: "Roppongi Keyakizaka Dori" }
                 ]
             },
@@ -337,18 +449,16 @@
                 events: [ { time: "全日", activity: "自由活動", icon: "✨", category: 'attraction', cost: 0, desc: "睡到自然醒，隨意探索東京", address: "" } ]
             },
             {
-                date: "12/5 (五)", shortDate: "05", city: "OTSUKA / UENO", theme: "完美句點", 
+                date: "12/5 (五)", shortDate: "05", city: "TOKYO / NARITA", theme: "自由活動與歸程", 
                 weather: { temp: "Loading...", condition: "...", summary: "Fetching..." },
-                lat: 35.7311, lng: 139.7281, isoDate: "2025-12-05",
-                guide: "Bongo 飯糰建議 10:30 前到。Skyliner 記得先買票。",
+                lat: 35.7141, lng: 139.7774, isoDate: "2025-12-05",
+                guide: "把握最後時間補貨或休息。Skyliner 記得先買票。",
                 events: [
                     { time: "09:30", activity: "退房 Check-out", icon: "👋", category: 'hotel', cost: 0, desc: "行李帶至上野或寄放", address: BOOKING_INFO.hotel.address, isWarning: true },
-                    { time: "10:00", activity: "前往大塚站", icon: "🚇", category: 'transport', cost: 200, desc: "山手線直達", address: "Otsuka Station" },
-                    { time: "10:30", activity: "排隊：Onigiri Bongo", icon: "🍙", category: 'food', cost: 0, desc: "東京最強飯糰，準備排隊", address: "Onigiri Bongo" },
-                    { time: "11:30", activity: "午餐：Bongo 飯糰", icon: "😋", category: 'food', cost: 0, desc: "推薦：鮭魚美乃滋、筋子", address: "" },
-                    { time: "13:00", activity: "上野阿美橫丁", icon: "🛍️", category: 'attraction', cost: 0, desc: "最後補貨：藥妝、零食", address: "Ameyoko Shopping District" },
+                    // 修改：去機場前的行程改為自由活動
+                    { time: "10:00", activity: "自由活動", icon: "✨", category: 'attraction', cost: 0, desc: "最後衝刺補貨 / 找間咖啡廳休息 / 隨意探索", address: "" },
                     { time: "15:30", activity: "Skyliner 往機場", icon: "🚆", category: 'transport', cost: 2500, desc: "京成上野站發車", address: "Keisei Ueno Station" },
-                    { time: "16:45", activity: "成田 T2 辦理登機", icon: "🛫", category: 'transport', cost: 0, desc: "UO647 | 起飛前3小時", address: "Narita Airport Terminal 2" },
+                    { time: "16:45", activity: "成田 T2 登機", icon: "🛫", category: 'transport', cost: 0, desc: "UO647 | 起飛前3小時", address: "Narita Airport Terminal 2" },
                     { time: "19:00", activity: "起飛返港", icon: "🇭🇰", category: 'transport', cost: 0, desc: "旅程圓滿結束", address: "" }
                 ]
             }
@@ -356,7 +466,39 @@
 
         let currentActiveDay = 0;
         let isBookingOpen = false;
+        let lastScrollTop = 0; 
 
+        // --- Internal Logic ---
+        
+        // Assign to global for reference in window. functions
+        window.renderWalletList_Global = renderWalletList;
+        window.switchDay_Global = switchDay;
+        window.updateBudget_Global = updateBudget;
+
+        function getWalletData() {
+            return JSON.parse(localStorage.getItem('japanTripWallet')) || [];
+        }
+
+        function saveWalletData(data) {
+            localStorage.setItem('japanTripWallet', JSON.stringify(data));
+            updateBudget();
+        }
+
+        function addExpense(item, amount, category, person) {
+            const data = getWalletData();
+            data.push({
+                id: Date.now(),
+                item,
+                amount: parseFloat(amount),
+                category,
+                person, 
+                date: new Date().toLocaleDateString()
+            });
+            saveWalletData(data);
+            renderWalletList();
+        }
+
+        // --- Weather Logic ---
         async function fetchRealTimeWeather(dayIndex) {
             const day = itineraryData[dayIndex];
             if (!day.lat || !day.lng || !day.isoDate) return;
@@ -402,11 +544,18 @@
             setTimeout(() => {
                 const home = document.getElementById('home-screen');
                 const content = document.getElementById('app-content-layer');
+                const nextBar = document.getElementById('next-event-bar');
+                const sos = document.querySelector('.sos-fab');
+
                 home.style.opacity = '0'; 
                 home.style.pointerEvents = 'none';
+                
                 setTimeout(() => {
                     content.classList.add('entered');
+                    nextBar.classList.remove('hidden-ui');
+                    sos.classList.remove('hidden-ui');
                 }, 50);
+
                 setTimeout(() => { 
                     home.style.display = 'none'; 
                     updateStickyHeaderPosition(); 
@@ -438,18 +587,48 @@
         }
 
         function updateBudget() {
-            let total = 0;
-            itineraryData.forEach(d => d.events.forEach(e => {
-                if (e.category === 'transport' || e.activity.includes('Ushigoro')) total += e.cost;
-            }));
             const budgetHKD = 12000;
-            const balance = budgetHKD - Math.round(total * 0.052);
+            const exchangeRate = 0.052;
+            
+            const walletData = getWalletData();
+            const totalExpensesJPY = walletData.reduce((sum, item) => sum + item.amount, 0);
+            
+            // Fixed expenses from itinerary (skipping hidden ones)
+            let fixedExpensesJPY = 0;
+            const hiddenEvents = JSON.parse(localStorage.getItem('japanTripHiddenEvents')) || {};
+            itineraryData.forEach((d, dIdx) => d.events.forEach((e, eIdx) => {
+                if (!hiddenEvents[`${dIdx}-${eIdx}`]) {
+                    if (e.category === 'transport' || e.activity.includes('Ushigoro')) fixedExpensesJPY += e.cost;
+                }
+            }));
+
+            const totalJPY = totalExpensesJPY + fixedExpensesJPY;
+            const balance = budgetHKD - Math.round(totalJPY * exchangeRate);
+            const balanceJPY = Math.round(balance / exchangeRate);
+
             document.getElementById('budget-summary').innerHTML = `
                 <div class="flex flex-col items-end">
-                    <span class="text-[8px] text-stone-400 font-bold tracking-widest font-sans-en mb-0.5">BALANCE (HKD)</span>
-                    <span class="text-base font-bold ${balance >= 0 ? 'text-stone-800' : 'text-red-700'} font-serif-en">$${balance.toLocaleString()}</span>
+                    <span class="text-[8px] text-stone-400 font-bold tracking-widest font-sans-en mb-0.5">BALANCE</span>
+                    <div class="flex flex-col items-end leading-tight">
+                        <span class="text-base font-bold ${balance >= 0 ? 'text-stone-800' : 'text-red-700'} font-serif-en animate-balance">HK$${balance.toLocaleString()}</span>
+                        <span class="text-[10px] font-medium ${balance >= 0 ? 'text-stone-400' : 'text-red-300'} font-serif-en">¥${balanceJPY.toLocaleString()}</span>
+                    </div>
                 </div>
             `;
+            
+            // Update Wallet Tab Summary
+            const totalEl = document.getElementById('wallet-total');
+            const dogEl = document.getElementById('wallet-dog');
+            const pigEl = document.getElementById('wallet-pig');
+            
+            if(totalEl) {
+                 const dogTotal = walletData.filter(x => x.person === '食屎狗').reduce((sum, x) => sum + x.amount, 0);
+                 const pigTotal = walletData.filter(x => x.person === '靚豬王').reduce((sum, x) => sum + x.amount, 0);
+                 
+                 totalEl.innerText = `¥${totalExpensesJPY.toLocaleString()}`;
+                 dogEl.innerText = `¥${dogTotal.toLocaleString()}`;
+                 pigEl.innerText = `¥${pigTotal.toLocaleString()}`;
+            }
         }
 
         function renderBookingInfo() {
@@ -480,6 +659,8 @@
         function renderTabs() {
             const container = document.getElementById('day-tabs');
             container.innerHTML = '';
+            
+            // Date Tabs
             itineraryData.forEach((day, idx) => {
                 const btn = document.createElement('button');
                 btn.className = `flex-1 py-4 relative group focus:outline-none transition-all duration-500`;
@@ -498,6 +679,25 @@
                 `;
                 container.appendChild(btn);
             });
+            
+            // Wallet Tab
+            const walletBtn = document.createElement('button');
+            walletBtn.id = 'tab-wallet';
+            walletBtn.className = `flex-1 py-4 relative group focus:outline-none transition-all duration-500`;
+            walletBtn.onclick = () => switchToWallet();
+            
+            const isWalletActive = currentActiveDay === 'wallet';
+            const wColorClass = isWalletActive ? 'text-stone-800 opacity-100' : 'text-stone-400 opacity-60 hover:opacity-100';
+            const wScaleClass = isWalletActive ? 'scale-110' : 'scale-100';
+
+            walletBtn.innerHTML = `
+                <div class="flex flex-col items-center ${wColorClass} ${wScaleClass} transition-all duration-500">
+                    <span class="text-[10px] font-bold tracking-widest font-sans-en mb-1">EXP</span>
+                    <span class="text-xl font-serif-en">¥</span>
+                </div>
+                <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-stone-800 transition-all duration-500 ${isWalletActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}"></div>
+            `;
+            container.appendChild(walletBtn);
         }
 
         function toggleEventDetails(element) {
@@ -529,10 +729,167 @@
             return `<svg class="w-24 h-24 text-stone-400 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>`;
         }
 
+        // --- Wallet Views ---
+        function switchToWallet() {
+            currentActiveDay = 'wallet';
+            renderTabs();
+            
+            if (isBookingOpen) toggleBookingDetails();
+            
+            document.getElementById('next-event-bar').classList.add('force-hidden');
+            
+            const container = document.getElementById('itinerary-content');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            container.innerHTML = `
+                <div class="px-8 pt-10 pb-6 animate-fade-in">
+                    <h2 class="text-3xl font-bold font-serif-jp text-stone-800 mb-2">消費記帳</h2>
+                    <p class="text-xs text-stone-500 font-sans-en tracking-widest uppercase mb-6">Expense Tracker</p>
+                    
+                    <!-- Summary Cards -->
+                    <div class="grid grid-cols-3 gap-2 mb-8">
+                        <div class="bg-stone-800 text-white p-3 rounded-xl flex flex-col items-center justify-center shadow-md">
+                             <span class="text-[10px] font-sans-en uppercase tracking-wider opacity-70">TOTAL</span>
+                             <span id="wallet-total" class="text-lg font-bold font-serif-en mt-1">¥0</span>
+                        </div>
+                        <div class="bg-white border border-stone-200 p-3 rounded-xl flex flex-col items-center justify-center shadow-sm">
+                             <span class="text-[10px] font-sans-jp font-bold text-stone-400">🐕 食屎狗</span>
+                             <span id="wallet-dog" class="text-sm font-bold font-serif-en text-stone-700 mt-1">¥0</span>
+                        </div>
+                        <div class="bg-white border border-stone-200 p-3 rounded-xl flex flex-col items-center justify-center shadow-sm">
+                             <span class="text-[10px] font-sans-jp font-bold text-stone-400">🐷 靚豬王</span>
+                             <span id="wallet-pig" class="text-sm font-bold font-serif-en text-stone-700 mt-1">¥0</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Input Form -->
+                    <div class="mb-8">
+                        <button onclick="document.getElementById('wallet-form-container').classList.toggle('open')" class="flex items-center justify-between w-full text-left text-xs font-bold text-stone-500 uppercase tracking-widest mb-4 hover:text-stone-800 transition-colors">
+                            <span>+ Add New Record</span>
+                            <span class="text-lg">+</span>
+                        </button>
+                        
+                        <div id="wallet-form-container" class="bg-white p-6 rounded-xl shadow-sm border border-stone-100 open">
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div class="col-span-2">
+                                    <label class="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1 block">Item</label>
+                                    <input type="text" id="expense-item" class="input-premium w-full" placeholder="e.g. Dinner, Taxi">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1 block">Amount (¥)</label>
+                                    <input type="number" id="expense-amount" class="input-premium w-full" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1 block">Category</label>
+                                    <select id="expense-category" class="input-premium w-full">
+                                        <option value="food">Food</option>
+                                        <option value="transport">Transport</option>
+                                        <option value="shopping">Shopping</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1 block">Who Paid?</label>
+                                    <div class="flex gap-3">
+                                        <label class="flex-1 cursor-pointer group">
+                                            <input type="radio" name="expense-person" value="食屎狗" class="peer hidden" checked>
+                                            <div class="input-premium text-center text-stone-500 peer-checked:bg-stone-800 peer-checked:text-white peer-checked:border-stone-800 transition-all group-hover:bg-stone-100">
+                                                🐕 食屎狗
+                                            </div>
+                                        </label>
+                                        <label class="flex-1 cursor-pointer group">
+                                            <input type="radio" name="expense-person" value="靚豬王" class="peer hidden">
+                                            <div class="input-premium text-center text-stone-500 peer-checked:bg-stone-800 peer-checked:text-white peer-checked:border-stone-800 transition-all group-hover:bg-stone-100">
+                                                🐷 靚豬王
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button onclick="submitExpense()" class="w-full bg-stone-800 text-white py-3 rounded-lg font-sans-en font-bold uppercase tracking-widest text-xs hover:bg-stone-700 transition-colors shadow-lg shadow-stone-200">
+                                Add Record
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- List Header -->
+                     <h3 class="text-lg font-bold font-serif-jp text-stone-700 mb-4 pb-2 border-b border-stone-200">消費明細</h3>
+
+                    <!-- List -->
+                    <div id="wallet-list" class="space-y-3 animate-zoom-in">
+                        <!-- List items injected here -->
+                    </div>
+                </div>
+            `;
+            renderWalletList();
+        }
+
+        function submitExpense() {
+            const item = document.getElementById('expense-item').value;
+            const amount = document.getElementById('expense-amount').value;
+            const category = document.getElementById('expense-category').value;
+            const person = document.querySelector('input[name="expense-person"]:checked').value;
+            
+            if(!item || !amount) return;
+            
+            addExpense(item, amount, category, person);
+            
+            document.getElementById('expense-item').value = '';
+            document.getElementById('expense-amount').value = '';
+        }
+
+        function renderWalletList() {
+            const list = document.getElementById('wallet-list');
+            if(!list) return;
+            
+            const data = getWalletData().sort((a, b) => b.id - a.id);
+            
+            if (data.length === 0) {
+                list.innerHTML = `<p class="text-center text-stone-400 text-sm py-10 italic font-serif-en">No records yet.</p>`;
+                updateBudget();
+                return;
+            }
+
+            let html = '';
+            data.forEach(record => {
+                const iconMap = { food: '🍔', transport: '🚇', shopping: '🛍️', other: '✨' };
+                const personBadge = record.person === '食屎狗' ? '🐕 食屎狗' : '🐷 靚豬王';
+                
+                html += `
+                    <div class="bg-white p-4 rounded-xl border border-stone-100 flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-stone-50 flex items-center justify-center text-xl mr-3 border border-stone-100">
+                                ${iconMap[record.category]}
+                            </div>
+                            <div>
+                                <p class="font-bold text-stone-800 text-sm font-sans-jp">${record.item}</p>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-[9px] bg-stone-100 px-2 py-0.5 rounded-full text-stone-600 font-sans-jp font-bold">${personBadge}</span>
+                                    <span class="text-[9px] text-stone-400 font-sans-en">${record.date}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="flex items-center">
+                                <span class="font-serif-en font-bold text-stone-800 mr-3 text-lg">¥${record.amount.toLocaleString()}</span>
+                                <!-- 使用 event.stopPropagation() 防止點擊卡片其他地方 -->
+                                <button type="button" onclick="window.removeWalletItem(${record.id}); event.stopPropagation();" class="w-10 h-10 rounded-full flex items-center justify-center text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors relative z-50 p-2 shadow-sm border border-transparent hover:border-red-100" aria-label="刪除">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            list.innerHTML = html;
+            updateBudget(); 
+        }
+
         function switchDay(idx) {
             currentActiveDay = idx;
             renderTabs();
             const day = itineraryData[idx];
+            const hiddenEvents = JSON.parse(localStorage.getItem('japanTripHiddenEvents')) || {};
             
             fetchRealTimeWeather(idx);
 
@@ -540,39 +897,68 @@
                 toggleBookingDetails();
             }
             
+            document.getElementById('next-event-bar').classList.remove('force-hidden');
+            
             const container = document.getElementById('itinerary-content');
 
             window.scrollTo({ top: 0, behavior: 'smooth' });
             
-            // 1. 封面區塊：設定 min-h-[55vh] 讓它佔據上半部大部分空間
-            // justify-end 讓內容沉在底部
+            // Update Next Event Bar Info
+            const nextEventBar = document.getElementById('next-event-bar');
+            const nextTitle = document.getElementById('next-event-title');
+            const nextTime = document.getElementById('next-event-time');
+            const nextIcon = document.getElementById('next-event-icon');
+
+            // Find first visible event
+            let firstEvent = null;
+            for (let i = 0; i < day.events.length; i++) {
+                if (!hiddenEvents[`${idx}-${i}`]) {
+                    firstEvent = day.events[i];
+                    break;
+                }
+            }
+
+            if (firstEvent) {
+                nextTitle.innerText = firstEvent.activity;
+                nextTime.innerText = firstEvent.time.split(' ')[0];
+                nextIcon.innerText = firstEvent.icon;
+                nextEventBar.classList.remove('force-hidden');
+                nextEventBar.classList.remove('scroll-hidden'); 
+            } else {
+                nextEventBar.classList.add('force-hidden');
+            }
+
+            // Header - CENTERED WEATHER ONLY (Title REMOVED)
             let html = `
-                <div class="min-h-[55vh] flex flex-col justify-end px-8 pb-10 animate-fade-in reveal-item">
+                <div class="px-8 pt-10 pb-6 animate-fade-in reveal-item">
                     <div class="flex flex-col items-center justify-center border-b border-stone-300 pb-8 mb-8">
-                        <div id="weather-icon-display" class="mb-6 transition-transform transform hover:scale-110">
+                        <!-- Weather Icon -->
+                        <div id="weather-icon-display" class="mb-4 transition-transform transform hover:scale-110">
                             ${getWeatherSvg(day.weather.condition)}
                         </div>
+                        <!-- Temp -->
                         <div class="text-center">
-                            <p id="weather-temp-display" class="text-8xl font-serif-en text-stone-800 leading-none tracking-tighter">${day.weather.temp}</p>
-                            <p id="weather-condition-display" class="text-xs font-sans-en text-stone-500 uppercase tracking-[0.2em] mt-3">${day.weather.condition}</p>
+                            <p id="weather-temp-display" class="text-7xl font-serif-en text-stone-800 leading-none">${day.weather.temp}</p>
+                            <p id="weather-condition-display" class="text-[10px] font-sans-en text-stone-400 uppercase tracking-widest mt-2">${day.weather.condition}</p>
                         </div>
                     </div>
                     
-                    <div class="mb-4">
-                         <p class="font-serif-jp font-bold text-stone-600 leading-loose text-sm text-center italic">
-                            “ ${day.guide} ”
+                    <div class="mb-10">
+                         <p class="font-serif-jp font-bold text-stone-600 leading-loose text-sm border-l-2 border-stone-300 pl-4">
+                            ${day.guide}
                          </p>
                     </div>
                 </div>
             `;
 
-            // 2. 列表區塊：接在下方
-            html += `<div class="px-4 space-y-0 animate-zoom-in pb-32">`; 
+            html += `<div class="px-4 space-y-0 animate-zoom-in">`; 
             
             day.events.forEach((ev, i) => {
-                // Stagger Delay
                 const delay = i * 150;
                 
+                // Check if hidden
+                if (hiddenEvents[`${idx}-${i}`]) return;
+
                 html += `
                     <div class="itinerary-item reveal-item group cursor-pointer py-5 px-4 rounded-lg" style="transition-delay: ${delay}ms" onclick="toggleEventDetails(this)">
                         <div class="timeline-line"></div>
@@ -586,7 +972,8 @@
                                 <span class="inline-block transition-all">${ev.icon}</span>
                             </div>
 
-                            <div class="flex-1 pt-0.5 border-b border-stone-300/40 pb-5 group-last:border-0">
+                            <div class="flex-1 pt-0.5 border-b border-stone-300/40 pb-5 group-last:border-0 relative">
+                                <!-- NEW: HIDE BUTTON INSIDE DETAILS TO AVOID ACCIDENTAL CLICKS -->
                                 <div class="flex justify-between items-center">
                                     <h3 class="text-base font-bold font-serif-jp text-stone-800 group-hover:text-stone-600 transition-colors ${ev.isWarning ? 'text-red-700' : ''}">${ev.activity}</h3>
                                     <div class="chevron text-stone-300 transition-transform duration-500">
@@ -606,9 +993,15 @@
                                             </a>
                                         </div>` : ''}
                                         
-                                        ${ev.cost > 0 ? `
-                                        <p class="text-right text-xs font-serif-en text-stone-400 mt-1">¥${ev.cost.toLocaleString()}</p>
-                                        ` : ''}
+                                        <div class="flex justify-between items-end mt-3 border-t border-stone-200 pt-2">
+                                            <button onclick="event.stopPropagation(); window.hideItineraryItem(${idx}, ${i})" class="text-xs text-red-400 hover:text-red-600 font-sans-jp flex items-center">
+                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                                                隱藏此行程 (不計入預算)
+                                            </button>
+                                            ${ev.cost > 0 ? `
+                                            <p class="text-right text-xs font-serif-en text-stone-400">¥${ev.cost.toLocaleString()}</p>
+                                            ` : ''}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -617,10 +1010,10 @@
                 `;
             });
             html += `</div>`;
-            
+            html += `<div class="h-28"></div>`; 
+
             container.innerHTML = html;
 
-            // 3. Scroll Reveal Observer
             setTimeout(() => {
                 const observer = new IntersectionObserver((entries) => {
                     entries.forEach(entry => {
@@ -629,16 +1022,11 @@
                             observer.unobserve(entry.target);
                         }
                     });
-                }, {
-                    root: null, // Use viewport
-                    threshold: 0.1
-                });
+                }, { root: null, threshold: 0.05, rootMargin: "0px 0px 50px 0px" });
 
                 const elements = container.querySelectorAll('.reveal-item');
-                elements.forEach((el) => {
-                    observer.observe(el);
-                });
-            }, 100);
+                elements.forEach((el) => observer.observe(el));
+            }, 50);
         }
 
         function switchToEmergency() {
@@ -646,6 +1034,8 @@
             renderTabs(); 
             
             if (isBookingOpen) toggleBookingDetails();
+            
+            document.getElementById('next-event-bar').classList.add('force-hidden');
 
             const container = document.getElementById('itinerary-content');
             let html = `
@@ -675,11 +1065,35 @@
             container.innerHTML = html;
         }
 
+        // Scroll Event Logic - SMART SCROLL
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('itinerary-content');
+            const nextEventBar = document.getElementById('next-event-bar');
+            
+            container.addEventListener('scroll', () => {
+                const scrollTop = container.scrollTop;
+                
+                // Threshold of 10px to avoid jitter
+                if (Math.abs(scrollTop - lastScrollTop) > 10) {
+                    if (scrollTop > lastScrollTop && scrollTop > 50) {
+                        // Scroll Down -> Hide
+                        nextEventBar.classList.add('scroll-hidden');
+                    } else {
+                        // Scroll Up -> Show
+                        nextEventBar.classList.remove('scroll-hidden');
+                    }
+                }
+                lastScrollTop = scrollTop <= 0 ? 0 : scrollTop; 
+            });
+        });
+
         window.onload = function() {
             renderBookingInfo();
             renderTabs();
+            // Initialize with first day
             switchDay(0);
             updateBudget();
+            // Ensure booking details is closed initially
             isBookingOpen = false;
             document.getElementById('booking-details-content').classList.remove('open');
         };
